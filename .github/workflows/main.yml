@@ -1,4 +1,4 @@
-name: 'Build and publish application'
+name: 'Build dll files'
 
 on:
   workflow_dispatch:
