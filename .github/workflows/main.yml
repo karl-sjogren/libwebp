@@ -1,6 +1,7 @@
 name: 'Build dll files'
 
 on:
+  push:
   workflow_dispatch:
 
 jobs:
@@ -26,3 +27,10 @@ jobs:
 
     - name: Run nmake
       run: nmake /f Makefile.vc CFG=release-dynamic RTLIBCFG=dynamic OBJDIR=output
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: artifacts-${{ matrix.arch }}
+        path: ./output/
+        if-no-files-found: error
