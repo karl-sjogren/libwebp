@@ -3,6 +3,11 @@ name: 'Build dll files'
 on:
   push:
   workflow_dispatch:
+    inputs:
+      branchName:
+        description: 'Name of the branch to build'
+        required: true
+        default: 'main'
 
 jobs:
 
@@ -19,6 +24,8 @@ jobs:
     steps:
     - name: Checkout sources
       uses: actions/checkout@v3
+      with:
+        ref: '${{ github.event.inputs.branchName }}'
 
     - name: Enable Developer Command Prompt (${{ matrix.arch }})
       uses: ilammy/msvc-dev-cmd@v1
@@ -31,6 +38,6 @@ jobs:
     - name: Upload build artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: artifacts-${{ matrix.arch }}
-        path: ./output/
+        name: libwebp-dll-${{ matrix.arch }}
+        path: ./output/**/*.dll
         if-no-files-found: error
