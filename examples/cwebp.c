@@ -178,8 +178,14 @@ static void PrintFullLosslessInfo(const WebPAuxStats* const stats,
     if (stats->lossless_features & 8) fprintf(stderr, " PALETTE");
     fprintf(stderr, "\n");
   }
-  fprintf(stderr, "  * Precision Bits: histogram=%d transform=%d cache=%d\n",
-          stats->histogram_bits, stats->transform_bits, stats->cache_bits);
+  fprintf(stderr, "  * Precision Bits: histogram=%d", stats->histogram_bits);
+  if (stats->lossless_features & 1) {
+    fprintf(stderr, " prediction=%d", stats->transform_bits);
+  }
+  if (stats->lossless_features & 2) {
+    fprintf(stderr, " cross-color=%d", stats->cross_color_transform_bits);
+  }
+  fprintf(stderr, " cache=%d\n", stats->cache_bits);
   if (stats->palette_size > 0) {
     fprintf(stderr, "  * Palette size:   %d\n", stats->palette_size);
   }
@@ -306,6 +312,7 @@ static int MyWriter(const uint8_t* data, size_t data_size,
 // Dumps a picture as a PGM file using the IMC4 layout.
 static int DumpPicture(const WebPPicture* const picture, const char* PGM_name) {
   int y;
+  int ok = 0;
   const int uv_width = (picture->width + 1) / 2;
   const int uv_height = (picture->height + 1) / 2;
   const int stride = (picture->width + 1) & ~1;
@@ -320,23 +327,26 @@ static int DumpPicture(const WebPPicture* const picture, const char* PGM_name) {
   if (f == NULL) return 0;
   fprintf(f, "P5\n%d %d\n255\n", stride, height);
   for (y = 0; y < picture->height; ++y) {
-    if (fwrite(src_y, picture->width, 1, f) != 1) return 0;
+    if (fwrite(src_y, picture->width, 1, f) != 1) goto Error;
     if (picture->width & 1) fputc(0, f);  // pad
     src_y += picture->y_stride;
   }
   for (y = 0; y < uv_height; ++y) {
-    if (fwrite(src_u, uv_width, 1, f) != 1) return 0;
-    if (fwrite(src_v, uv_width, 1, f) != 1) return 0;
+    if (fwrite(src_u, uv_width, 1, f) != 1) goto Error;
+    if (fwrite(src_v, uv_width, 1, f) != 1) goto Error;
     src_u += picture->uv_stride;
     src_v += picture->uv_stride;
   }
   for (y = 0; y < alpha_height; ++y) {
-    if (fwrite(src_a, picture->width, 1, f) != 1) return 0;
+    if (fwrite(src_a, picture->width, 1, f) != 1) goto Error;
     if (picture->width & 1) fputc(0, f);  // pad
     src_a += picture->a_stride;
   }
+  ok = 1;
+
+ Error:
   fclose(f);
-  return 1;
+  return ok;
 }
 
 // -----------------------------------------------------------------------------
@@ -647,8 +657,9 @@ static const char* const kErrorMessages[VP8_ENC_ERROR_LAST] = {
 
 //------------------------------------------------------------------------------
 
+// Returns EXIT_SUCCESS on success, EXIT_FAILURE on failure.
 int main(int argc, const char* argv[]) {
-  int return_value = -1;
+  int return_value = EXIT_FAILURE;
   const char* in_file = NULL, *out_file = NULL, *dump_file = NULL;
   FILE* out = NULL;
   int c;
@@ -682,22 +693,22 @@ int main(int argc, const char* argv[]) {
       !WebPPictureInit(&original_picture) ||
       !WebPConfigInit(&config)) {
     fprintf(stderr, "Error! Version mismatch!\n");
-    FREE_WARGV_AND_RETURN(-1);
+    FREE_WARGV_AND_RETURN(EXIT_FAILURE);
   }
 
   if (argc == 1) {
     HelpShort();
-    FREE_WARGV_AND_RETURN(0);
+    FREE_WARGV_AND_RETURN(EXIT_SUCCESS);
   }
 
   for (c = 1; c < argc; ++c) {
     int parse_error = 0;
     if (!strcmp(argv[c], "-h") || !strcmp(argv[c], "-help")) {
       HelpShort();
-      FREE_WARGV_AND_RETURN(0);
+      FREE_WARGV_AND_RETURN(EXIT_SUCCESS);
     } else if (!strcmp(argv[c], "-H") || !strcmp(argv[c], "-longhelp")) {
       HelpLong();
-      FREE_WARGV_AND_RETURN(0);
+      FREE_WARGV_AND_RETURN(EXIT_SUCCESS);
     } else if (!strcmp(argv[c], "-o") && c + 1 < argc) {
       out_file = (const char*)GET_WARGV(argv, ++c);
     } else if (!strcmp(argv[c], "-d") && c + 1 < argc) {
@@ -838,7 +849,7 @@ int main(int argc, const char* argv[]) {
       printf("libsharpyuv: %d.%d.%d\n",
              (sharpyuv_version >> 24) & 0xff, (sharpyuv_version >> 16) & 0xffff,
              sharpyuv_version & 0xff);
-      FREE_WARGV_AND_RETURN(0);
+      FREE_WARGV_AND_RETURN(EXIT_SUCCESS);
     } else if (!strcmp(argv[c], "-progress")) {
       show_progress = 1;
     } else if (!strcmp(argv[c], "-quiet")) {
@@ -900,7 +911,7 @@ int main(int argc, const char* argv[]) {
         if (i == kNumTokens) {
           fprintf(stderr, "Error! Unknown metadata type '%.*s'\n",
                   (int)(token - start), start);
-          FREE_WARGV_AND_RETURN(-1);
+          FREE_WARGV_AND_RETURN(EXIT_FAILURE);
         }
         start = token + 1;
       }
@@ -919,14 +930,14 @@ int main(int argc, const char* argv[]) {
     } else if (argv[c][0] == '-') {
       fprintf(stderr, "Error! Unknown option '%s'\n", argv[c]);
       HelpLong();
-      FREE_WARGV_AND_RETURN(-1);
+      FREE_WARGV_AND_RETURN(EXIT_FAILURE);
     } else {
       in_file = (const char*)GET_WARGV(argv, c);
     }
 
     if (parse_error) {
       HelpLong();
-      FREE_WARGV_AND_RETURN(-1);
+      FREE_WARGV_AND_RETURN(EXIT_FAILURE);
     }
   }
   if (in_file == NULL) {
@@ -1227,7 +1238,7 @@ int main(int argc, const char* argv[]) {
       PrintMetadataInfo(&metadata, metadata_written);
     }
   }
-  return_value = 0;
+  return_value = EXIT_SUCCESS;
 
  Error:
   WebPMemoryWriterClear(&memory_writer);

@@ -400,14 +400,15 @@ static float FastLog2Slow_C(uint32_t v) {
 // Methods to calculate Entropy (Shannon).
 
 // Compute the combined Shanon's entropy for distribution {X} and {X+Y}
-static float CombinedShannonEntropy_C(const int X[256], const int Y[256]) {
+static float CombinedShannonEntropy_C(const uint32_t X[256],
+                                      const uint32_t Y[256]) {
   int i;
   float retval = 0.f;
-  int sumX = 0, sumXY = 0;
+  uint32_t sumX = 0, sumXY = 0;
   for (i = 0; i < 256; ++i) {
-    const int x = X[i];
+    const uint32_t x = X[i];
     if (x != 0) {
-      const int xy = x + Y[i];
+      const uint32_t xy = x + Y[i];
       sumX += x;
       retval -= VP8LFastSLog2(x);
       sumXY += xy;
@@ -577,7 +578,7 @@ static WEBP_INLINE uint8_t TransformColorBlue(uint8_t green_to_blue,
 
 void VP8LCollectColorRedTransforms_C(const uint32_t* argb, int stride,
                                      int tile_width, int tile_height,
-                                     int green_to_red, int histo[]) {
+                                     int green_to_red, uint32_t histo[]) {
   while (tile_height-- > 0) {
     int x;
     for (x = 0; x < tile_width; ++x) {
@@ -590,7 +591,7 @@ void VP8LCollectColorRedTransforms_C(const uint32_t* argb, int stride,
 void VP8LCollectColorBlueTransforms_C(const uint32_t* argb, int stride,
                                       int tile_width, int tile_height,
                                       int green_to_blue, int red_to_blue,
-                                      int histo[]) {
+                                      uint32_t histo[]) {
   while (tile_height-- > 0) {
     int x;
     for (x = 0; x < tile_width; ++x) {
@@ -636,20 +637,25 @@ void VP8LBundleColorMap_C(const uint8_t* const row, int width, int xbits,
 
 //------------------------------------------------------------------------------
 
-static float ExtraCost_C(const uint32_t* population, int length) {
+static uint32_t ExtraCost_C(const uint32_t* population, int length) {
   int i;
-  float cost = 0.f;
-  for (i = 2; i < length - 2; ++i) cost += (i >> 1) * population[i + 2];
+  uint32_t cost = population[4] + population[5];
+  assert(length % 2 == 0);
+  for (i = 2; i < length / 2 - 1; ++i) {
+    cost += i * (population[2 * i + 2] + population[2 * i + 3]);
+  }
   return cost;
 }
 
-static float ExtraCostCombined_C(const uint32_t* X, const uint32_t* Y,
-                                  int length) {
+static uint32_t ExtraCostCombined_C(const uint32_t* X, const uint32_t* Y,
+                                    int length) {
   int i;
-  float cost = 0.f;
-  for (i = 2; i < length - 2; ++i) {
-    const int xy = X[i + 2] + Y[i + 2];
-    cost += (i >> 1) * xy;
+  uint32_t cost = X[4] + Y[4] + X[5] + Y[5];
+  assert(length % 2 == 0);
+  for (i = 2; i < length / 2 - 1; ++i) {
+    const int xy0 = X[2 * i + 2] + Y[2 * i + 2];
+    const int xy1 = X[2 * i + 3] + Y[2 * i + 3];
+    cost += i * (xy0 + xy1);
   }
   return cost;
 }
@@ -791,6 +797,7 @@ VP8LBundleColorMapFunc VP8LBundleColorMap;
 VP8LPredictorAddSubFunc VP8LPredictorsSub[16];
 VP8LPredictorAddSubFunc VP8LPredictorsSub_C[16];
 
+extern VP8CPUInfo VP8GetCPUInfo;
 extern void VP8LEncDspInitSSE2(void);
 extern void VP8LEncDspInitSSE41(void);
 extern void VP8LEncDspInitNEON(void);
