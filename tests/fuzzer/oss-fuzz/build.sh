@@ -18,6 +18,7 @@
 # This script is meant to be run by the oss-fuzz infrastructure from the script
 # https://github.com/google/oss-fuzz/blob/master/projects/libwebp/build.sh
 # It builds the different fuzz targets.
+# Only the libfuzzer engine is supported.
 
 # To test changes to this file:
 # - make changes and commit to your REPO
@@ -38,22 +39,20 @@
 
 set -eu
 
-# Avoid fuzz engines that do not compile.
-if [[ "$FUZZING_ENGINE" != "libfuzzer" && "$FUZZING_ENGINE" != "centipede" ]]; then
-  exit
-fi
+EXTRA_CMAKE_FLAGS=""
+export CXXFLAGS="${CXXFLAGS} -DFUZZTEST_COMPATIBILITY_MODE"
+EXTRA_CMAKE_FLAGS="-DFUZZTEST_COMPATIBILITY_MODE=libfuzzer"
 
 # limit allocation size to reduce spurious OOMs
 WEBP_CFLAGS="$CFLAGS -DWEBP_MAX_IMAGE_SIZE=838860800" # 800MiB
 
 export CFLAGS="$WEBP_CFLAGS"
-cmake -S . -B build -DWEBP_BUILD_FUZZTEST=ON
+cmake -S . -B build -DWEBP_BUILD_FUZZTEST=ON ${EXTRA_CMAKE_FLAGS}
 cd build && make -j$(nproc) && cd ..
 
 find $SRC/libwebp-test-data -type f -size -32k -iname "*.webp" \
   -exec zip -qju fuzz_seed_corpus.zip "{}" \;
 
-# build fuzztests
 # The following is taken from https://github.com/google/oss-fuzz/blob/31ac7244748ea7390015455fb034b1f4eda039d9/infra/base-images/base-builder/compile_fuzztests.sh#L59
 # Iterate the fuzz binaries and list each fuzz entrypoint in the binary. For
 # each entrypoint create a wrapper script that calls into the binaries the
