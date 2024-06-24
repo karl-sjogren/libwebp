@@ -44,7 +44,7 @@ jobs:
 
   buildl-linux:
     name: Build Linux
-    runs-on: buntu-latest
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout sources
