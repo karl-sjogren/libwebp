@@ -53,7 +53,4 @@ jobs:
         ref: '${{ github.event.inputs.branchName }}'
 
     - name: Run nmake
-      run: |
-        ./configure
-        make
-        make install
+      run: make -f makefile.unix
