@@ -1,4 +1,4 @@
-name: 'Build dll files'
+name: 'Build stuff files'
 
 on:
   push:
@@ -11,8 +11,8 @@ on:
 
 jobs:
 
-  build:
-    name: Build
+  build-windows:
+    name: Build Windows
     runs-on: windows-latest
 
     strategy:
@@ -41,3 +41,19 @@ jobs:
         name: libwebp-dll-${{ matrix.arch }}
         path: ./output/**/*.dll
         if-no-files-found: error
+
+  buildl-linux:
+    name: Build Linux
+    runs-on: buntu-latest
+
+    steps:
+    - name: Checkout sources
+      uses: actions/checkout@v3
+      with:
+        ref: '${{ github.event.inputs.branchName }}'
+
+    - name: Run nmake
+      run: |
+        ./configure
+        make
+        make install
